@@ -319,6 +319,7 @@ function bigbluebutton_init_database() {
     moderatorPW text NOT NULL,
     waitForModerator BOOLEAN NOT NULL DEFAULT FALSE,
     recorded BOOLEAN NOT NULL DEFAULT FALSE,
+    voicebridge int NOT NULL DEFAULT 0,
     UNIQUE KEY id (id)
     );";
     dbDelta($sql);
@@ -429,7 +430,7 @@ function bigbluebutton_form($args, $bigbluebutton_form_in_widget = false) {
     $permissions = get_option('bigbluebutton_permissions');
 
     //Gets all the meetings from wordpress database
-    $listOfMeetings = $wpdb->get_results("SELECT meetingID, meetingName, meetingVersion, attendeePW, moderatorPW FROM ".$table_name." ORDER BY meetingName");
+    $listOfMeetings = $wpdb->get_results("SELECT meetingID, meetingName, meetingVersion, attendeePW, moderatorPW, voicebridge FROM ".$table_name." ORDER BY meetingName");
      
     $dataSubmitted = false;
     $meetingExist = false;
@@ -479,7 +480,6 @@ function bigbluebutton_form($args, $bigbluebutton_form_in_widget = false) {
             $welcome = (isset($args['welcome']))? html_entity_decode($args['welcome']): BIGBLUEBUTTON_STRING_WELCOME;
             if( $recorded ) $welcome .= BIGBLUEBUTTON_STRING_MEETING_RECORDED;
             $duration = 0;
-            $voicebridge = (isset($args['voicebridge']))? html_entity_decode($args['voicebridge']): 0;
             $logouturl = (is_ssl()? "https://": "http://") . $_SERVER['HTTP_HOST']  . $_SERVER['REQUEST_URI'];
 
             //Metadata for tagging recordings
@@ -492,7 +492,7 @@ function bigbluebutton_form($args, $bigbluebutton_form_in_widget = false) {
                     'meta_originurl' => $logouturl
             );
             //Call for creating meeting on the bigbluebutton server
-            $response = BigBlueButton::createMeetingArray($name, $found->meetingID, $found->meetingName, $welcome, $found->moderatorPW, $found->attendeePW, $salt_val, $url_val, $logouturl, $recorded? 'true':'false', $duration, $voicebridge, $metadata );
+            $response = BigBlueButton::createMeetingArray($name, $found->meetingID, $found->meetingName, $welcome, $found->moderatorPW, $found->attendeePW, $salt_val, $url_val, $logouturl, $recorded? 'true':'false', $duration, $found->voicebridge, $metadata );
 
             //Analyzes the bigbluebutton server's response
             if(!$response || $response['returncode'] == 'FAILED' ) {//If the server is unreachable, or an error occured
@@ -890,6 +890,7 @@ function bigbluebutton_create_meetings() {
         $moderatorPW = $_POST[ 'moderatorPW' ]? $_POST[ 'moderatorPW' ]: bigbluebutton_generatePasswd(6, 2, $attendeePW);
         $waitForModerator = (isset($_POST[ 'waitForModerator' ]) && $_POST[ 'waitForModerator' ] == 'True')? true: false;
         $recorded = (isset($_POST[ 'recorded' ]) && $_POST[ 'recorded' ] == 'True')? true: false;
+        $voicebridge = isset($_POST[ 'voicebridge' ])? $_POST[ 'voicebridge' ]: 0;
         $meetingVersion = time();
         /// Assign a random seed to generate unique ID on a BBB server
         $meetingID = bigbluebutton_generateToken();
@@ -926,7 +927,7 @@ function bigbluebutton_create_meetings() {
              
             //If the meeting doesn't exist in the wordpress database then create it
             if(!$alreadyExists) {
-                $rows_affected = $wpdb->insert( $table_name, array( 'meetingID' => $meetingID, 'meetingName' => $meetingName, 'meetingVersion' => $meetingVersion, 'attendeePW' => $attendeePW, 'moderatorPW' => $moderatorPW, 'waitForModerator' => $waitForModerator? 1: 0, 'recorded' => $recorded? 1: 0) );
+                $rows_affected = $wpdb->insert( $table_name, array( 'meetingID' => $meetingID, 'meetingName' => $meetingName, 'meetingVersion' => $meetingVersion, 'attendeePW' => $attendeePW, 'moderatorPW' => $moderatorPW, 'waitForModerator' => $waitForModerator? 1: 0, 'recorded' => $recorded? 1: 0, 'voicebridge' => $voicebridge) );
 
                 $out .= '<div class="updated">
                 <p>
@@ -946,6 +947,7 @@ function bigbluebutton_create_meetings() {
     <p>Meeting Room Name: <input type="text" name="meetingName" value="" size="20"></p>
     <p>Attendee Password: <input type="text" name="attendeePW" value="" size="20"></p>
     <p>Moderator Password: <input type="text" name="moderatorPW" value="" size="20"></p>
+    <p>Voice bridge: <input type="text" name="voicebridge" value="" size="5" /></p>
     <p>Wait for moderator to start meeting: <input type="checkbox" name="waitForModerator" value="True" /></p>
     <p>Recorded meeting: <input type="checkbox" name="recorded" value="True" /></p>
     <p class="submit"><input type="submit" name="SubmitCreate" class="button-primary" value="Create" /></p>
@@ -989,7 +991,6 @@ function bigbluebutton_list_meetings() {
             if($_POST['SubmitList'] == 'Join') {
             	//Extra parameters
             	$duration = 0;
-            	$voicebridge = 0;
             	$logouturl = (is_ssl()? "https://": "http://") . $_SERVER['HTTP_HOST']  . $_SERVER['REQUEST_URI'];
             
             	//Metadata for tagging recordings
@@ -1005,7 +1006,7 @@ function bigbluebutton_list_meetings() {
             	//Calls create meeting on the bigbluebutton server
             	$welcome = BIGBLUEBUTTON_STRING_WELCOME;
             	if( $recorded ) $welcome .= BIGBLUEBUTTON_STRING_MEETING_RECORDED;
-            	$response = BigBlueButton::createMeetingArray($current_user->display_name, $found->meetingID, $found->meetingName, $welcome, $found->moderatorPW, $found->attendeePW, $salt_val, $url_val, $logouturl, ($found->recorded? 'true':'false'), $duration, $voicebridge, $metadata );
+            	$response = BigBlueButton::createMeetingArray($current_user->display_name, $found->meetingID, $found->meetingName, $welcome, $found->moderatorPW, $found->attendeePW, $salt_val, $url_val, $logouturl, ($found->recorded? 'true':'false'), $duration, $found->voicebridge, $metadata );
             
             	$createNew = false;
             	//Analyzes the bigbluebutton server's response
@@ -1136,6 +1137,7 @@ function bigbluebutton_list_meetings() {
             <td>'.$meeting->meetingID.'</td>
             <td>'.$meeting->attendeePW.'</td>
             <td>'.$meeting->moderatorPW.'</td>
+            <td>'.$meeting->voicebridge.'</td>
             <td>'.($meeting->waitForModerator? 'Yes': 'No').'</td>
             <td>'.($meeting->recorded? 'Yes': 'No').'</td>
             <td><input type="submit" name="SubmitList" class="button-primary" value="Join" />&nbsp;
@@ -1158,6 +1160,7 @@ function bigbluebutton_list_meetings() {
             <td>'.$meeting->meetingID.'</td>
             <td>'.$meeting->attendeePW.'</td>
             <td>'.$meeting->moderatorPW.'</td>
+            <td>'.$meeting->voicebridge.'</td>
             <td>'.($meeting->waitForModerator? 'Yes': 'No').'</td>
             <td>'.($meeting->recorded? 'Yes': 'No').'</td>';
             if( isset($info['hasBeenForciblyEnded']) && $info['hasBeenForciblyEnded']=='false') {
@@ -1379,6 +1382,7 @@ function bigbluebutton_print_table_header() {
         <th class="hed" colspan="1">Meeting Token</td>
         <th class="hed" colspan="1">Attendee Password</td>
         <th class="hed" colspan="1">Moderator Password</td>
+        <th class="hed" colspan="1">Voice Conference Number</td>
         <th class="hed" colspan="1">Wait for Moderator</td>
         <th class="hed" colspan="1">Recorded</td>
         <th class="hedextra" colspan="1">Actions</td>
