@@ -390,7 +390,7 @@ function bigbluebutton_sidebar($args) {
     extract($args);
 
     echo $before_widget;
-    echo $before_title.'BigBlueButton'.$after_title;
+    echo $before_title.'Web Conferencing'.$after_title;
     echo bigbluebutton_form($args, BIGBLUEBUTTON_FORM_IN_WIDGET);
     echo $after_widget;
 }
